@@ -1,0 +1,1328 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Brain, CheckCircle, Circle, Lock, ArrowRight, Download, Target, Lightbulb, Eye, RotateCcw, Home, AlertCircle } from 'lucide-react';
+
+// Shared Canvas Component
+const EvidenceCanvas = ({ width = 500, height = 240 }) => {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    ctx.scale(dpr, dpr);
+    
+    // Draw scene
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(0, 0, width, height);
+    
+    // Window frame
+    ctx.fillStyle = '#6B4423';
+    ctx.fillRect(width - 140, 30, 120, 180);
+    
+    // Window panes
+    ctx.fillStyle = '#87CEEB';
+    ctx.fillRect(width - 135, 35, 50, 80);
+    ctx.fillRect(width - 75, 35, 50, 80);
+    
+    // Sun
+    ctx.fillStyle = '#fbaf1b';
+    ctx.beginPath();
+    ctx.arc(width - 65, 70, 24, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Sun rays
+    for (let i = 0; i < 8; i++) {
+      const angle = (i * Math.PI) / 4;
+      ctx.strokeStyle = '#fbaf1b';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(width - 65 + Math.cos(angle) * 30, 70 + Math.sin(angle) * 30);
+      ctx.lineTo(width - 65 + Math.cos(angle) * 40, 70 + Math.sin(angle) * 40);
+      ctx.stroke();
+    }
+    
+    // Pot
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(120, 180, 80, 50);
+    
+    // Soil
+    ctx.fillStyle = '#654321';
+    ctx.fillRect(122, 180, 76, 15);
+    
+    // Plant stem
+    ctx.strokeStyle = '#41ba78';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(160, 180);
+    ctx.quadraticCurveTo(160, 130, width - 160, 100);
+    ctx.stroke();
+    
+    // Leaves
+    ctx.fillStyle = '#41ba78';
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.ellipse(width - 185 + i * 20, 110 - i * 12, 18, 10, -Math.PI / 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Labels
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = 'bold 11px -apple-system, sans-serif';
+    ctx.fillText('Window', width - 120, 25);
+    ctx.fillText('Plant', 135, 175);
+    
+    // Arrow
+    ctx.strokeStyle = '#f15c49';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(220, 140);
+    ctx.lineTo(width - 180, 140);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(width - 180, 140);
+    ctx.lineTo(width - 190, 135);
+    ctx.moveTo(width - 180, 140);
+    ctx.lineTo(width - 190, 145);
+    ctx.stroke();
+  }, [width, height]);
+
+  return <canvas ref={canvasRef} className="rounded-lg max-w-full h-auto" />;
+};
+
+const KairosCERLearning = () => {
+  const [currentView, setCurrentView] = useState('hub');
+  const [currentModule, setCurrentModule] = useState(null);
+  const [moduleProgress, setModuleProgress] = useState({
+    claim: { learn: false, practice: false, build: false },
+    evidence: { learn: false, practice: false, build: false },
+    reasoning: { learn: false, practice: false, build: false }
+  });
+  const [finalAnswers, setFinalAnswers] = useState({});
+
+  const caseData = {
+    id: 'plant',
+    title: 'The Bending Plant Mystery',
+    icon: '🌱',
+    question: 'Why is the plant bending toward the window?'
+  };
+
+  const modules = {
+    claim: {
+      id: 'claim',
+      title: 'Claims',
+      subtitle: 'Answer the question clearly',
+      color: '#239ad6',
+      icon: Target,
+      learnContent: {
+        concept: 'A CLAIM is your direct answer to the investigation question. It must be specific, definitive, and explain WHY something happens.',
+        strong: [
+          { text: 'The plant bends toward the window because it exhibits phototropism, growing toward the light source.', why: 'Answers WHY, uses scientific terms, definitive' },
+          { text: 'The plant shows phototropic growth, bending toward sunlight to maximize photosynthesis.', why: 'Clear causation, scientific vocabulary, explains purpose' }
+        ],
+        weak: [
+          { text: 'The plant is bending.', why: 'Only describes WHAT, no explanation of WHY' },
+          { text: 'I think maybe the plant wants light.', why: 'Uncertain language, anthropomorphic, no science' },
+          { text: 'The plant looks weird.', why: 'Vague observation, no answer to question' }
+        ]
+      },
+      practice: {
+        question: 'Which statement is the BEST claim?',
+        options: [
+          { text: 'The plant is bending toward the window.', correct: false, feedback: 'This describes WHAT but not WHY. A claim must answer the question.' },
+          { text: 'I think the plant might be growing toward light.', correct: false, feedback: 'Avoid uncertain words. Be definitive and use scientific terms.' },
+          { text: 'The plant bends toward the window due to phototropism, growing toward the light source to maximize energy capture.', correct: true, feedback: 'Excellent! Answers WHY, uses scientific terminology, explains purpose.' },
+          { text: 'Plants need sunlight to survive.', correct: false, feedback: 'General fact, not a specific answer to THIS investigation.' }
+        ]
+      },
+      build: {
+        template: [
+          { type: 'text', value: 'The plant bends toward the window because ' },
+          { type: 'select', options: ['it exhibits phototropism', 'it looks nice', 'it wants attention'], correct: 0, id: 'reason' },
+          { type: 'text', value: ', which causes it to ' },
+          { type: 'select', options: ['grow toward the light source', 'grow randomly', 'fall over'], correct: 0, id: 'mechanism' },
+          { type: 'text', value: ' to ' },
+          { type: 'select', options: ['maximize photosynthesis', 'look pretty', 'drink water'], correct: 0, id: 'purpose' },
+          { type: 'text', value: '.' }
+        ]
+      }
+    },
+    evidence: {
+      id: 'evidence',
+      title: 'Evidence',
+      subtitle: 'Observable facts only',
+      color: '#41ba78',
+      icon: Eye,
+      learnContent: {
+        concept: 'EVIDENCE consists of specific, observable facts from the image. Not interpretations or opinions - only what you can actually see.',
+        strong: [
+          { text: 'The stem curves approximately 45 degrees from vertical toward the window.', why: 'Specific, measurable, observable' },
+          { text: 'All three leaves are oriented facing the window where the sun is visible.', why: 'Countable, directional, factual' },
+          { text: 'The stem shows a gradual curve rather than a sharp bend.', why: 'Describes observable pattern' }
+        ],
+        weak: [
+          { text: 'The plant wants light.', why: 'Interpretation, not observation' },
+          { text: 'The plant is healthy.', why: 'Opinion, not specific fact' },
+          { text: 'There is a window.', why: 'Too vague, lacks detail' }
+        ],
+        criteria: 'Good evidence is SPECIFIC (details), OBSERVABLE (visible), MEASURABLE (quantifiable), MULTIPLE (3+ pieces)'
+      },
+      practice: {
+        items: [
+          { text: 'The stem curves approximately 45 degrees toward the window', strong: true },
+          { text: 'The plant wants more sunlight', strong: false },
+          { text: 'All leaves face the direction of the window', strong: true },
+          { text: 'The plant is happy', strong: false },
+          { text: 'A bright sun is visible through the window', strong: true },
+          { text: 'The plant is trying to reach the light', strong: false }
+        ]
+      },
+      build: {
+        areas: [
+          { id: 'stem', label: 'Stem Direction', feature: 'The stem' },
+          { id: 'leaves', label: 'Leaf Orientation', feature: 'The leaves' },
+          { id: 'light', label: 'Light Source', feature: 'The window/sun' }
+        ],
+        descriptors: {
+          stem: [
+            { text: 'curves approximately 45 degrees from vertical toward the window', correct: true },
+            { text: 'wants to reach the light', correct: false },
+            { text: 'is green and healthy looking', correct: false },
+            { text: 'shows a gradual bend rather than a sharp angle', correct: true }
+          ],
+          leaves: [
+            { text: 'are all oriented facing the window', correct: true },
+            { text: 'look happy and healthy', correct: false },
+            { text: 'are trying to get sunlight', correct: false },
+            { text: 'number three total, all pointing toward the light source', correct: true }
+          ],
+          light: [
+            { text: 'has a bright sun visible through the glass', correct: true },
+            { text: 'makes the plant happy', correct: false },
+            { text: 'is what the plant wants', correct: false },
+            { text: 'is positioned to the right side of the image', correct: true }
+          ]
+        }
+      }
+    },
+    reasoning: {
+      id: 'reasoning',
+      title: 'Reasoning',
+      subtitle: 'Connect with science',
+      color: '#fbaf1b',
+      icon: Lightbulb,
+      learnContent: {
+        concept: 'REASONING connects evidence to your claim using scientific principles. Use: BECAUSE [science] ... THEREFORE [connection].',
+        science: 'Plants have phototropin proteins detecting light. Auxin hormone accumulates on the shaded side, causing those cells to elongate more. This creates the bend.',
+        structure: {
+          because: 'plants contain phototropin proteins that detect light direction, and auxin hormone accumulates on the shaded side causing faster cell elongation',
+          therefore: 'the plant systematically bends toward light to maximize photosynthesis'
+        }
+      },
+      practice: {
+        correctChain: [
+          { id: 1, text: 'This evidence supports my claim BECAUSE', type: 'scientific' },
+          { id: 2, text: 'plants detect light direction using phototropin proteins', type: 'scientific' },
+          { id: 3, text: 'which causes auxin to accumulate on the shaded side', type: 'scientific' },
+          { id: 4, text: 'making those cells elongate faster', type: 'scientific' },
+          { id: 5, text: 'THEREFORE', type: 'scientific' },
+          { id: 6, text: 'the plant bends toward light to maximize photosynthesis', type: 'scientific' }
+        ],
+        redHerrings: [
+          { id: 'r1', text: 'the plant needs water to survive', type: 'irrelevant' },
+          { id: 'r2', text: 'plants want to be close to windows', type: 'anthropomorphic' },
+          { id: 'r3', text: 'the plant is trying to escape the pot', type: 'anthropomorphic' },
+          { id: 'r4', text: 'green plants are prettier than brown ones', type: 'opinion' }
+        ]
+      },
+      build: {
+        template: [
+          { type: 'text', value: 'This evidence supports my claim BECAUSE plants have ' },
+          { type: 'input', placeholder: 'light-sensing proteins', correct: ['phototropin'], id: 'protein' },
+          { type: 'text', value: ' that detect light. The hormone ' },
+          { type: 'input', placeholder: 'growth hormone', correct: ['auxin'], id: 'hormone' },
+          { type: 'text', value: ' accumulates on the ' },
+          { type: 'select', options: ['shaded side', 'lit side', 'top'], correct: 0, id: 'location' },
+          { type: 'text', value: ', causing cells to ' },
+          { type: 'select', options: ['elongate faster', 'shrink', 'die'], correct: 0, id: 'effect' },
+          { type: 'text', value: '. THEREFORE, the plant bends toward light to maximize ' },
+          { type: 'input', placeholder: 'energy process', correct: ['photosynthesis'], id: 'purpose' },
+          { type: 'text', value: '.' }
+        ]
+      }
+    }
+  };
+
+  if (currentView === 'hub') {
+    return <HubView 
+      moduleProgress={moduleProgress} 
+      setCurrentModule={setCurrentModule} 
+      setCurrentView={setCurrentView} 
+      caseData={caseData} 
+      modules={modules} 
+      finalAnswers={finalAnswers} 
+    />;
+  }
+
+  if (!currentModule || !modules[currentModule]) {
+    setCurrentView('hub');
+    return null;
+  }
+
+  const module = modules[currentModule];
+
+  if (currentView === 'learn') {
+    return <LearnView module={module} currentModule={currentModule} setModuleProgress={setModuleProgress} setCurrentView={setCurrentView} />;
+  }
+
+  if (currentView === 'practice') {
+    return <PracticeView module={module} currentModule={currentModule} setModuleProgress={setModuleProgress} setCurrentView={setCurrentView} />;
+  }
+
+  if (currentView === 'build') {
+    return <BuildView module={module} currentModule={currentModule} setModuleProgress={setModuleProgress} setCurrentView={setCurrentView} setFinalAnswers={setFinalAnswers} />;
+  }
+
+  return null;
+};
+
+const HubView = ({ moduleProgress, setCurrentModule, setCurrentView, caseData, modules, finalAnswers }) => {
+  const allComplete = Object.values(moduleProgress).every(m => m.learn && m.practice && m.build);
+  const claimComplete = moduleProgress.claim.learn && moduleProgress.claim.practice && moduleProgress.claim.build;
+  const evidenceComplete = moduleProgress.evidence.learn && moduleProgress.evidence.practice && moduleProgress.evidence.build;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 md:p-6">
+      <div className="max-w-5xl mx-auto">
+        <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-purple-200/50 overflow-hidden mb-6">
+          <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 p-6 md:p-8 relative">
+            <div className="absolute inset-0 bg-black/10"></div>
+            <div className="relative z-10 flex items-center gap-4">
+              <Brain className="w-10 h-10 md:w-12 md:h-12 text-white" />
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold text-white mb-1">Kairos CER Learning</h1>
+                <p className="text-sm md:text-base text-purple-100">Master scientific argumentation through structured practice</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 md:p-8">
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-purple-600 rounded-lg p-4 md:p-6 mb-6">
+              <div className="flex items-start gap-3">
+                <Target className="w-5 h-5 md:w-6 md:h-6 text-purple-600 flex-shrink-0 mt-1" />
+                <div>
+                  <h3 className="font-bold text-purple-900 mb-2 text-sm md:text-base">Investigation Question</h3>
+                  <p className="text-slate-700 text-base md:text-lg">{caseData.question}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-900 rounded-xl p-3 md:p-4 mb-6 flex items-center justify-center">
+              <EvidenceCanvas />
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-3 md:gap-4 mb-6">
+              {Object.values(modules).map((module) => {
+                const progress = moduleProgress[module.id];
+                const completed = progress.learn && progress.practice && progress.build;
+                const inProgress = progress.learn || progress.practice;
+                let locked = false;
+                if (module.id === 'evidence') locked = !claimComplete;
+                if (module.id === 'reasoning') locked = !evidenceComplete;
+
+                return (
+                  <button
+                    key={module.id}
+                    onClick={() => {
+                      if (!locked) {
+                        setCurrentModule(module.id);
+                        setCurrentView('learn');
+                      }
+                    }}
+                    disabled={locked}
+                    className={`relative p-4 md:p-6 rounded-xl border-2 transition-all text-left ${
+                      locked
+                        ? 'bg-slate-100 border-slate-300 cursor-not-allowed opacity-60'
+                        : completed
+                        ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-400 hover:shadow-lg hover:scale-105 cursor-pointer'
+                        : inProgress
+                        ? 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-400 hover:shadow-lg hover:scale-105 cursor-pointer'
+                        : 'bg-white border-slate-300 hover:border-purple-400 hover:shadow-lg hover:scale-105 cursor-pointer'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-3 md:mb-4">
+                      <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center ${
+                        locked ? 'bg-slate-300' : ''
+                      }`} style={{ backgroundColor: locked ? undefined : `${module.color}20` }}>
+                        {locked ? (
+                          <Lock className="w-5 h-5 md:w-6 md:h-6 text-slate-500" />
+                        ) : completed ? (
+                          <CheckCircle className="w-5 h-5 md:w-6 md:h-6 text-green-600" />
+                        ) : (
+                          <module.icon className="w-5 h-5 md:w-6 md:h-6" style={{ color: module.color }} />
+                        )}
+                      </div>
+                      <div className="text-xs font-semibold text-slate-500">
+                        {locked ? 'Locked' : completed ? 'Complete' : inProgress ? 'In Progress' : 'Start'}
+                      </div>
+                    </div>
+                    <h3 className="text-lg md:text-xl font-bold text-slate-800 mb-1">{module.title}</h3>
+                    <p className="text-xs md:text-sm text-slate-600 mb-3 md:mb-4">{module.subtitle}</p>
+                    <div className="flex gap-1">
+                      {['learn', 'practice', 'build'].map(stage => (
+                        <div
+                          key={stage}
+                          className={`flex-1 h-1.5 rounded-full ${
+                            progress[stage] ? 'bg-green-500' : 'bg-slate-200'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {allComplete && (
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-400 rounded-xl p-4 md:p-6">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg md:text-xl font-bold text-green-900 mb-2 flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 md:w-6 md:h-6" />
+                      All Modules Complete!
+                    </h3>
+                    <p className="text-sm md:text-base text-green-800">Export your validated work for the Google Form assessment.</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const exportData = {
+                        caseId: caseData.id,
+                        caseTitle: caseData.title,
+                        question: caseData.question,
+                        timestamp: new Date().toISOString(),
+                        ...finalAnswers
+                      };
+                      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = `cer-validated-${Date.now()}.json`;
+                      link.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2 transition-all hover:scale-105 whitespace-nowrap"
+                  >
+                    <Download className="w-5 h-5" />
+                    Export for Form
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const LearnView = ({ module, currentModule, setModuleProgress, setCurrentView }) => {
+  const content = module.learnContent;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 md:p-6">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-purple-200/50 overflow-hidden">
+          <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 p-4 md:p-6 relative">
+            <div className="absolute inset-0 bg-black/10"></div>
+            <div className="relative z-10 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center">
+                  <module.icon className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl md:text-2xl font-bold text-white">Understanding {module.title}</h2>
+                  <p className="text-xs md:text-sm text-purple-100">Learn the concept</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCurrentView('hub')}
+                className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg transition-all flex items-center gap-2 text-sm"
+              >
+                <Home className="w-4 h-4" />
+                <span className="hidden md:inline">Hub</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 md:p-8">
+            <div className="bg-gradient-to-br from-blue-50 to-purple-50 border-l-4 rounded-lg p-4 md:p-6 mb-6" style={{ borderLeftColor: module.color }}>
+              <h3 className="font-bold text-slate-900 mb-3">What is {module.title}?</h3>
+              <p className="text-slate-700 text-base md:text-lg leading-relaxed">{content.concept}</p>
+              {content.criteria && (
+                <p className="mt-3 text-slate-700 font-medium text-sm md:text-base">{content.criteria}</p>
+              )}
+              {content.science && (
+                <div className="mt-4 bg-white/70 rounded p-3 md:p-4">
+                  <p className="text-xs md:text-sm font-semibold text-purple-900 mb-2">Science Background:</p>
+                  <p className="text-sm md:text-base text-slate-700">{content.science}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-400 rounded-xl p-4 md:p-6">
+                <h3 className="font-bold text-green-900 mb-4 flex items-center gap-2 text-sm md:text-base">
+                  <CheckCircle className="w-4 h-4 md:w-5 md:h-5" />
+                  Strong {module.title}
+                </h3>
+                <div className="space-y-3 md:space-y-4">
+                  {content.strong && content.strong.map((item, i) => (
+                    <div key={i} className="bg-white rounded-lg p-3 md:p-4 border border-green-200">
+                      <p className="text-slate-700 mb-2 leading-relaxed text-sm md:text-base">{item.text}</p>
+                      <p className="text-xs text-green-700 font-medium flex items-center gap-2">
+                        <CheckCircle className="w-3 h-3" />
+                        {item.why}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-red-50 to-rose-50 border-2 border-red-400 rounded-xl p-4 md:p-6">
+                <h3 className="font-bold text-red-900 mb-4 flex items-center gap-2 text-sm md:text-base">
+                  <Circle className="w-4 h-4 md:w-5 md:h-5" />
+                  Weak {module.title}
+                </h3>
+                <div className="space-y-3 md:space-y-4">
+                  {content.weak && content.weak.map((item, i) => (
+                    <div key={i} className="bg-white rounded-lg p-3 md:p-4 border border-red-200 opacity-75">
+                      <p className="text-slate-600 mb-2 leading-relaxed italic text-sm md:text-base">{item.text}</p>
+                      <p className="text-xs text-red-700 font-medium flex items-center gap-2">
+                        <Circle className="w-3 h-3" />
+                        Problem: {item.why}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setModuleProgress(prev => ({
+                  ...prev,
+                  [currentModule]: { ...prev[currentModule], learn: true }
+                }));
+                setCurrentView('practice');
+              }}
+              className="w-full bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 hover:from-purple-700 hover:via-pink-700 hover:to-indigo-700 text-white font-bold py-3 md:py-4 rounded-lg transition-all hover:scale-105 flex items-center justify-center gap-3 text-sm md:text-base"
+            >
+              Continue to Practice
+              <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PracticeView = ({ module, currentModule, setModuleProgress, setCurrentView }) => {
+  const [state, setState] = useState({});
+
+  if (module.id === 'claim') {
+    const practice = module.practice || {};
+    const { question = '', options = [] } = practice;
+    const selected = state.selected;
+    const showFeedback = state.showFeedback;
+    const isCorrect = selected !== undefined && options[selected]?.correct;
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 md:p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-purple-200/50 overflow-hidden">
+            <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 p-4 md:p-6 relative">
+              <div className="absolute inset-0 bg-black/10"></div>
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center">
+                    <module.icon className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-bold text-white">Practice: {module.title}</h2>
+                    <p className="text-xs md:text-sm text-purple-100">Choose the best option</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setCurrentView('hub')}
+                  className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg transition-all flex items-center gap-2 text-sm"
+                >
+                  <Home className="w-4 h-4" />
+                  <span className="hidden md:inline">Hub</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 md:p-8">
+              <div className="bg-slate-900 rounded-xl p-3 mb-6 flex items-center justify-center">
+                <EvidenceCanvas />
+              </div>
+
+              <div className="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4 md:p-6 mb-6">
+                <p className="text-base md:text-lg font-semibold text-slate-800">{question}</p>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                {options.map((option, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setState({ selected: index, showFeedback: true })}
+                    disabled={showFeedback}
+                    className={`w-full text-left p-4 md:p-5 rounded-xl border-2 transition-all text-sm md:text-base ${
+                      selected === index
+                        ? option.correct
+                          ? 'border-green-500 bg-gradient-to-br from-green-50 to-emerald-50'
+                          : 'border-red-500 bg-gradient-to-br from-red-50 to-rose-50'
+                        : 'border-slate-300 bg-white hover:border-purple-400 hover:shadow-lg'
+                    } ${showFeedback ? 'cursor-default' : 'cursor-pointer'}`}
+                  >
+                    <div className="flex items-start gap-3 md:gap-4">
+                      <div className={`w-5 h-5 md:w-6 md:h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center mt-0.5 ${
+                        selected === index
+                          ? option.correct
+                            ? 'border-green-500 bg-green-500'
+                            : 'border-red-500 bg-red-500'
+                          : 'border-slate-400 bg-white'
+                      }`}>
+                        {selected === index && (
+                          option.correct 
+                            ? <CheckCircle className="w-3 h-3 md:w-4 md:h-4 text-white" /> 
+                            : <Circle className="w-3 h-3 md:w-4 md:h-4 text-white" />
+                        )}
+                      </div>
+                      <span className="text-slate-700 leading-relaxed flex-1">{option.text}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {showFeedback && selected !== undefined && options[selected] && (
+                <div className={`rounded-xl p-4 md:p-6 mb-6 border-l-4 text-sm md:text-base ${
+                  options[selected].correct
+                    ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-500'
+                    : 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-500'
+                }`}>
+                  <p className="text-slate-800 leading-relaxed flex items-start gap-3">
+                    {options[selected].correct ? (
+                      <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                    ) : (
+                      <Lightbulb className="w-4 h-4 md:w-5 md:h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    )}
+                    <span>{options[selected].feedback}</span>
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-3 md:gap-4">
+                <button
+                  onClick={() => setState({})}
+                  className="flex-1 bg-slate-600 hover:bg-slate-700 text-white font-semibold py-3 md:py-4 rounded-lg transition-all flex items-center justify-center gap-2 text-sm md:text-base"
+                >
+                  <RotateCcw className="w-4 h-4 md:w-5 md:h-5" />
+                  Try Again
+                </button>
+                {isCorrect && (
+                  <button
+                    onClick={() => {
+                      setModuleProgress(prev => ({
+                        ...prev,
+                        [currentModule]: { ...prev[currentModule], practice: true }
+                      }));
+                      setCurrentView('build');
+                    }}
+                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-3 md:py-4 rounded-lg transition-all hover:scale-105 flex items-center justify-center gap-2 text-sm md:text-base"
+                  >
+                    Continue
+                    <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (module.id === 'evidence') {
+    const practice = module.practice || {};
+    const items = practice.items || [];
+    const sorted = state.sorted || { strong: [], weak: [] };
+    const remaining = items.filter(item => 
+      !sorted.strong.includes(item) && !sorted.weak.includes(item)
+    );
+    
+    const allSorted = remaining.length === 0;
+    const allCorrect = allSorted && 
+      sorted.strong.every(item => item.strong) && 
+      sorted.weak.every(item => !item.strong);
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 md:p-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-purple-200/50 overflow-hidden">
+            <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 p-4 md:p-6 relative">
+              <div className="absolute inset-0 bg-black/10"></div>
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center">
+                    <module.icon className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-bold text-white">Practice: Sorting Evidence</h2>
+                    <p className="text-xs md:text-sm text-purple-100">Categorize observations vs interpretations</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setCurrentView('hub')}
+                  className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg transition-all flex items-center gap-2 text-sm"
+                >
+                  <Home className="w-4 h-4" />
+                  <span className="hidden md:inline">Hub</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 md:p-8">
+              <div className="grid md:grid-cols-3 gap-3 md:gap-4 mb-6">
+                <div className="bg-slate-100 rounded-xl p-3 md:p-4">
+                  <h3 className="font-bold text-slate-700 mb-3 text-xs md:text-sm">To Sort</h3>
+                  <div className="space-y-2">
+                    {remaining.map((item, index) => (
+                      <div key={index} className="bg-white border-2 border-slate-300 rounded-lg p-2 md:p-3">
+                        <p className="text-slate-700 text-xs md:text-sm mb-2">{item.text}</p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setState({ sorted: { ...sorted, strong: [...sorted.strong, item] } })}
+                            className="flex-1 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold py-1.5 rounded transition-all"
+                          >
+                            Strong
+                          </button>
+                          <button
+                            onClick={() => setState({ sorted: { ...sorted, weak: [...sorted.weak, item] } })}
+                            className="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold py-1.5 rounded transition-all"
+                          >
+                            Weak
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {remaining.length === 0 && (
+                      <p className="text-xs md:text-sm text-slate-500 italic text-center py-8">All sorted!</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-400 rounded-xl p-3 md:p-4">
+                  <h3 className="font-bold text-green-900 mb-3 text-xs md:text-sm flex items-center gap-2">
+                    <CheckCircle className="w-3 h-3 md:w-4 md:h-4" />
+                    Strong Evidence
+                  </h3>
+                  <div className="space-y-2">
+                    {sorted.strong.map((item, index) => (
+                      <div 
+                        key={index} 
+                        className={`rounded-lg p-2 md:p-3 text-xs md:text-sm border-2 ${
+                          item.strong 
+                            ? 'bg-green-100 border-green-400' 
+                            : 'bg-red-100 border-red-400'
+                        }`}
+                      >
+                        <p className="flex items-start gap-2">
+                          {item.strong ? (
+                            <CheckCircle className="w-3 h-3 md:w-4 md:h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          ) : (
+                            <Circle className="w-3 h-3 md:w-4 md:h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                          )}
+                          <span className="text-slate-700">{item.text}</span>
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-red-50 to-rose-50 border-2 border-red-400 rounded-xl p-3 md:p-4">
+                  <h3 className="font-bold text-red-900 mb-3 text-xs md:text-sm flex items-center gap-2">
+                    <Circle className="w-3 h-3 md:w-4 md:h-4" />
+                    Weak Evidence
+                  </h3>
+                  <div className="space-y-2">
+                    {sorted.weak.map((item, index) => (
+                      <div 
+                        key={index} 
+                        className={`rounded-lg p-2 md:p-3 text-xs md:text-sm border-2 ${
+                          !item.strong 
+                            ? 'bg-green-100 border-green-400' 
+                            : 'bg-red-100 border-red-400'
+                        }`}
+                      >
+                        <p className="flex items-start gap-2">
+                          {!item.strong ? (
+                            <CheckCircle className="w-3 h-3 md:w-4 md:h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          ) : (
+                            <Circle className="w-3 h-3 md:w-4 md:h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                          )}
+                          <span className="text-slate-700">{item.text}</span>
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {allSorted && !allCorrect && (
+                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border-l-4 border-amber-500 rounded-lg p-4 md:p-6 mb-6">
+                  <p className="text-amber-900 flex items-start gap-3 text-sm md:text-base">
+                    <Lightbulb className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0 mt-0.5" />
+                    <span>Some items are misplaced. Observable facts are Strong, interpretations are Weak.</span>
+                  </p>
+                </div>
+              )}
+
+              {allCorrect && (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 rounded-lg p-4 md:p-6 mb-6">
+                  <p className="text-green-900 font-semibold flex items-center gap-3 text-sm md:text-base">
+                    <CheckCircle className="w-4 h-4 md:w-5 md:h-5" />
+                    Perfect! You can distinguish observable evidence from interpretations.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-3 md:gap-4">
+                <button
+                  onClick={() => setState({ sorted: { strong: [], weak: [] } })}
+                  className="flex-1 bg-slate-600 hover:bg-slate-700 text-white font-semibold py-3 md:py-4 rounded-lg transition-all flex items-center justify-center gap-2 text-sm md:text-base"
+                >
+                  <RotateCcw className="w-4 h-4 md:w-5 md:h-5" />
+                  Reset
+                </button>
+                {allCorrect && (
+                  <button
+                    onClick={() => {
+                      setModuleProgress(prev => ({
+                        ...prev,
+                        [currentModule]: { ...prev[currentModule], practice: true }
+                      }));
+                      setCurrentView('build');
+                    }}
+                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-3 md:py-4 rounded-lg transition-all hover:scale-105 flex items-center justify-center gap-2 text-sm md:text-base"
+                  >
+                    Continue
+                    <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (module.id === 'reasoning') {
+    const practice = module.practice || {};
+    const correctChain = practice.correctChain || [];
+    const redHerrings = practice.redHerrings || [];
+    
+    const allItems = [...correctChain, ...redHerrings].sort(() => Math.random() - 0.5);
+    const order = state.order || [];
+    const available = allItems.filter(item => !order.find(o => o.id === item.id));
+    
+    const isCorrect = order.length === correctChain.length && 
+                     order.every((item, idx) => item.id === correctChain[idx].id);
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 md:p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-purple-200/50 overflow-hidden">
+            <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 p-4 md:p-6 relative">
+              <div className="absolute inset-0 bg-black/10"></div>
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center">
+                    <module.icon className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-bold text-white">Practice: Ordering Reasoning</h2>
+                    <p className="text-xs md:text-sm text-purple-100">Build scientific chain, avoid red herrings</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setCurrentView('hub')}
+                  className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg transition-all flex items-center gap-2 text-sm"
+                >
+                  <Home className="w-4 h-4" />
+                  <span className="hidden md:inline">Hub</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 md:p-8">
+              <div className="bg-amber-50 border-l-4 border-amber-500 rounded-lg p-4 mb-6">
+                <p className="text-sm text-amber-900 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>Warning: Some statements are red herrings! Only select statements that build a scientific reasoning chain.</span>
+                </p>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4 md:gap-6 mb-6">
+                <div className="bg-slate-100 rounded-xl p-3 md:p-4">
+                  <h3 className="font-bold text-slate-700 mb-3 text-sm md:text-base">Available Statements</h3>
+                  <div className="space-y-2">
+                    {available.map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => setState({ order: [...order, item] })}
+                        className={`w-full text-left border-2 rounded-lg p-2 md:p-3 text-xs md:text-sm transition-all ${
+                          item.type === 'scientific' 
+                            ? 'bg-white hover:bg-blue-50 border-slate-300 hover:border-blue-400'
+                            : 'bg-red-50 hover:bg-red-100 border-red-200 hover:border-red-400'
+                        }`}
+                      >
+                        {item.text}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-400 rounded-xl p-3 md:p-4">
+                  <h3 className="font-bold text-amber-900 mb-3 text-sm md:text-base">Your Reasoning Chain</h3>
+                  <div className="space-y-2">
+                    {order.map((item, index) => {
+                      const isRedHerring = item.type !== 'scientific';
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => setState({ order: order.filter(o => o.id !== item.id) })}
+                          className={`w-full text-left border-2 rounded-lg p-2 md:p-3 text-xs md:text-sm transition-all ${
+                            isCorrect 
+                              ? 'bg-green-100 border-green-400' 
+                              : isRedHerring
+                              ? 'bg-red-100 border-red-400'
+                              : 'bg-white border-amber-300 hover:border-red-400'
+                          }`}
+                        >
+                          <span className="font-bold text-amber-700 mr-2">{index + 1}.</span>
+                          {item.text}
+                          {isRedHerring && (
+                            <span className="ml-2 text-red-600 font-bold text-xs">(Red herring!)</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                    {order.length === 0 && (
+                      <p className="text-xs md:text-sm text-slate-500 italic text-center py-8">Click statements to add</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {order.length > 0 && !isCorrect && order.some(item => item.type !== 'scientific') && (
+                <div className="bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-500 rounded-lg p-4 md:p-6 mb-6">
+                  <p className="text-red-900 flex items-start gap-3 text-sm md:text-base">
+                    <AlertCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0 mt-0.5" />
+                    <span>You've included red herrings! Remove non-scientific statements.</span>
+                  </p>
+                </div>
+              )}
+
+              {order.length === correctChain.length && !isCorrect && order.every(item => item.type === 'scientific') && (
+                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border-l-4 border-amber-500 rounded-lg p-4 md:p-6 mb-6">
+                  <p className="text-amber-900 flex items-start gap-3 text-sm md:text-base">
+                    <Lightbulb className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0 mt-0.5" />
+                    <span>Good! All scientific statements. Now check the order: BECAUSE (science) ... THEREFORE (connection).</span>
+                  </p>
+                </div>
+              )}
+
+              {isCorrect && (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 rounded-lg p-4 md:p-6 mb-6">
+                  <p className="text-green-900 font-semibold flex items-center gap-3 text-sm md:text-base">
+                    <CheckCircle className="w-4 h-4 md:w-5 md:h-5" />
+                    Excellent! You avoided red herrings and built a proper scientific reasoning chain.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-3 md:gap-4">
+                <button
+                  onClick={() => setState({ order: [] })}
+                  className="flex-1 bg-slate-600 hover:bg-slate-700 text-white font-semibold py-3 md:py-4 rounded-lg transition-all flex items-center justify-center gap-2 text-sm md:text-base"
+                >
+                  <RotateCcw className="w-4 h-4 md:w-5 md:h-5" />
+                  Reset
+                </button>
+                {isCorrect && (
+                  <button
+                    onClick={() => {
+                      setModuleProgress(prev => ({
+                        ...prev,
+                        [currentModule]: { ...prev[currentModule], practice: true }
+                      }));
+                      setCurrentView('build');
+                    }}
+                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-3 md:py-4 rounded-lg transition-all hover:scale-105 flex items-center justify-center gap-2 text-sm md:text-base"
+                  >
+                    Continue
+                    <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
+
+const BuildView = ({ module, currentModule, setModuleProgress, setCurrentView, setFinalAnswers }) => {
+  const [inputs, setInputs] = useState({});
+
+  if (module.id === 'claim' || module.id === 'reasoning') {
+    const build = module.build || {};
+    const template = build.template || [];
+    
+    const checkInput = (id, value, correct) => {
+      if (!value) return false;
+      if (Array.isArray(correct)) {
+        return correct.some(c => value.toLowerCase().trim().includes(c.toLowerCase()));
+      }
+      return value.toLowerCase().trim() === correct.toLowerCase();
+    };
+
+    const allCorrect = template
+      .filter(item => item.type !== 'text')
+      .every(item => {
+        const value = inputs[item.id];
+        if (item.type === 'select') return parseInt(value) === item.correct;
+        if (item.type === 'input') return value && checkInput(item.id, value, item.correct);
+        return false;
+      });
+
+    const allFilled = template
+      .filter(item => item.type !== 'text')
+      .every(item => inputs[item.id] !== undefined && inputs[item.id] !== '');
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 md:p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-purple-200/50 overflow-hidden">
+            <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 p-4 md:p-6 relative">
+              <div className="absolute inset-0 bg-black/10"></div>
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center">
+                    <module.icon className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-bold text-white">Build Your {module.title}</h2>
+                    <p className="text-xs md:text-sm text-purple-100">Complete with correct choices</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setCurrentView('hub')}
+                  className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg transition-all flex items-center gap-2 text-sm"
+                >
+                  <Home className="w-4 h-4" />
+                  <span className="hidden md:inline">Hub</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 md:p-8">
+              <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-4 md:p-6 mb-6">
+                <p className="text-slate-700 text-sm md:text-base leading-relaxed">
+                  {template.map((item, index) => {
+                    if (item.type === 'text') {
+                      return <span key={index}>{item.value}</span>;
+                    }
+                    if (item.type === 'select') {
+                      const isAnswered = inputs[item.id] !== undefined && inputs[item.id] !== '';
+                      const isCorrect = parseInt(inputs[item.id]) === item.correct;
+                      return (
+                        <select
+                          key={index}
+                          value={inputs[item.id] ?? ''}
+                          onChange={(e) => setInputs({ ...inputs, [item.id]: e.target.value })}
+                          className={`mx-1 px-2 md:px-3 py-1 rounded-lg border-2 font-semibold text-xs md:text-sm ${
+                            !isAnswered
+                              ? 'border-slate-300 bg-white'
+                              : isCorrect
+                              ? 'border-green-500 bg-green-50 text-green-900'
+                              : 'border-red-500 bg-red-50 text-red-900'
+                          }`}
+                        >
+                          <option value="">?</option>
+                          {item.options && item.options.map((opt, i) => (
+                            <option key={i} value={i}>{opt}</option>
+                          ))}
+                        </select>
+                      );
+                    }
+                    if (item.type === 'input') {
+                      const value = inputs[item.id] || '';
+                      const isAnswered = value.length > 0;
+                      const isCorrect = checkInput(item.id, value, item.correct);
+                      return (
+                        <input
+                          key={index}
+                          type="text"
+                          value={value}
+                          onChange={(e) => setInputs({ ...inputs, [item.id]: e.target.value })}
+                          placeholder={item.placeholder}
+                          className={`mx-1 px-2 md:px-3 py-1 rounded-lg border-2 font-semibold text-xs md:text-sm ${
+                            !isAnswered
+                              ? 'border-slate-300'
+                              : isCorrect
+                              ? 'border-green-500 bg-green-50'
+                              : 'border-amber-500 bg-amber-50'
+                          }`}
+                          style={{ width: '140px' }}
+                        />
+                      );
+                    }
+                    return null;
+                  })}
+                </p>
+              </div>
+
+              {allFilled && !allCorrect && (
+                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border-l-4 border-amber-500 rounded-lg p-4 md:p-6 mb-6">
+                  <p className="text-amber-900 flex items-start gap-3 text-sm md:text-base">
+                    <Lightbulb className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0 mt-0.5" />
+                    <span>Keep trying! Think about the scientific concepts you learned.</span>
+                  </p>
+                </div>
+              )}
+
+              {allCorrect && (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 rounded-lg p-4 md:p-6 mb-6">
+                  <p className="text-green-900 font-semibold flex items-center gap-3 text-sm md:text-base">
+                    <CheckCircle className="w-4 h-4 md:w-5 md:h-5" />
+                    Perfect! You've built a scientifically accurate {module.title.toLowerCase()}.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-3 md:gap-4">
+                <button
+                  onClick={() => setInputs({})}
+                  className="flex-1 bg-slate-600 hover:bg-slate-700 text-white font-semibold py-3 md:py-4 rounded-lg transition-all flex items-center justify-center gap-2 text-sm md:text-base"
+                >
+                  <RotateCcw className="w-4 h-4 md:w-5 md:h-5" />
+                  Reset
+                </button>
+                {allCorrect && (
+                  <button
+                    onClick={() => {
+                      const complete = template.map(item => {
+                        if (item.type === 'text') return item.value;
+                        if (item.type === 'select') return item.options[parseInt(inputs[item.id])];
+                        if (item.type === 'input') return inputs[item.id];
+                        return '';
+                      }).join('');
+                      setFinalAnswers(prev => ({ ...prev, [module.id]: complete }));
+                      setModuleProgress(prev => ({
+                        ...prev,
+                        [currentModule]: { ...prev[currentModule], build: true }
+                      }));
+                      setCurrentView('hub');
+                    }}
+                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-3 md:py-4 rounded-lg transition-all hover:scale-105 flex items-center justify-center gap-2 text-sm md:text-base"
+                  >
+                    Complete Module
+                    <CheckCircle className="w-4 h-4 md:w-5 md:h-5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (module.id === 'evidence') {
+    const build = module.build || {};
+    const areas = build.areas || [];
+    const descriptors = build.descriptors || {};
+    const selections = inputs.selections || {};
+    
+    const allSelected = areas.every(area => selections[area.id]?.length > 0);
+    const allCorrect = areas.every(area => 
+      selections[area.id]?.every(desc => desc.correct)
+    );
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 md:p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-purple-200/50 overflow-hidden">
+            <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 p-4 md:p-6 relative">
+              <div className="absolute inset-0 bg-black/10"></div>
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center">
+                    <module.icon className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-bold text-white">Build Your Evidence</h2>
+                    <p className="text-xs md:text-sm text-purple-100">Match features to observations</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setCurrentView('hub')}
+                  className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg transition-all flex items-center gap-2 text-sm"
+                >
+                  <Home className="w-4 h-4" />
+                  <span className="hidden md:inline">Hub</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 md:p-8">
+              <div className="bg-slate-900 rounded-xl p-3 mb-6 flex items-center justify-center">
+                <EvidenceCanvas />
+              </div>
+
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 rounded-lg p-3 md:p-4 mb-6">
+                <h3 className="font-bold text-green-900 mb-2 text-sm md:text-base">Instructions:</h3>
+                <p className="text-xs md:text-sm text-slate-700">For each feature below, select ALL correct observable descriptions (avoid interpretations).</p>
+              </div>
+
+              <div className="space-y-6 mb-6">
+                {areas.map((area) => {
+                  const areaSelections = selections[area.id] || [];
+                  const areaDescriptors = descriptors[area.id] || [];
+                  
+                  return (
+                    <div key={area.id} className="bg-slate-50 rounded-xl p-4">
+                      <h3 className="font-bold text-slate-800 mb-3 text-sm md:text-base">
+                        {area.label}: <span className="text-slate-600">{area.feature}</span>
+                      </h3>
+                      
+                      <div className="space-y-2">
+                        {areaDescriptors.map((desc, idx) => {
+                          const isSelected = areaSelections.includes(desc);
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                const newSelections = isSelected
+                                  ? areaSelections.filter(d => d !== desc)
+                                  : [...areaSelections, desc];
+                                setInputs({
+                                  selections: { ...selections, [area.id]: newSelections }
+                                });
+                              }}
+                              className={`w-full text-left p-3 rounded-lg border-2 transition-all text-xs md:text-sm ${
+                                isSelected
+                                  ? desc.correct
+                                    ? 'border-green-500 bg-green-50'
+                                    : 'border-red-500 bg-red-50'
+                                  : 'border-slate-300 bg-white hover:border-blue-400'
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center mt-0.5 ${
+                                  isSelected
+                                    ? desc.correct
+                                      ? 'border-green-500 bg-green-500'
+                                      : 'border-red-500 bg-red-500'
+                                    : 'border-slate-400'
+                                }`}>
+                                  {isSelected && (
+                                    desc.correct 
+                                      ? <CheckCircle className="w-3 h-3 text-white" />
+                                      : <Circle className="w-3 h-3 text-white" />
+                                  )}
+                                </div>
+                                <span className="text-slate-700 flex-1">{desc.text}</span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {allSelected && !allCorrect && (
+                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border-l-4 border-amber-500 rounded-lg p-4 md:p-6 mb-6">
+                  <p className="text-amber-900 flex items-start gap-3 text-sm md:text-base">
+                    <Lightbulb className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0 mt-0.5" />
+                    <span>Some selections include interpretations rather than observations. Look for measurable, factual descriptions.</span>
+                  </p>
+                </div>
+              )}
+
+              {allCorrect && allSelected && (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 rounded-lg p-4 md:p-6 mb-6">
+                  <p className="text-green-900 font-semibold flex items-center gap-3 text-sm md:text-base">
+                    <CheckCircle className="w-4 h-4 md:w-5 md:h-5" />
+                    Perfect! You've identified only observable, factual evidence.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-3 md:gap-4">
+                <button
+                  onClick={() => setInputs({ selections: {} })}
+                  className="flex-1 bg-slate-600 hover:bg-slate-700 text-white font-semibold py-3 md:py-4 rounded-lg transition-all flex items-center justify-center gap-2 text-sm md:text-base"
+                >
+                  <RotateCcw className="w-4 h-4 md:w-5 md:h-5" />
+                  Reset
+                </button>
+                {allCorrect && allSelected && (
+                  <button
+                    onClick={() => {
+                      const evidenceList = areas.map(area => {
+                        const correctDescs = selections[area.id].filter(d => d.correct);
+                        return correctDescs.map(d => d.text).join('; ');
+                      }).filter(Boolean);
+                      
+                      const complete = evidenceList.map((e, i) => `${i + 1}. ${e}`).join('\n');
+                      setFinalAnswers(prev => ({ ...prev, evidence: complete }));
+                      setModuleProgress(prev => ({
+                        ...prev,
+                        [currentModule]: { ...prev[currentModule], build: true }
+                      }));
+                      setCurrentView('hub');
+                    }}
+                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-3 md:py-4 rounded-lg transition-all hover:scale-105 flex items-center justify-center gap-2 text-sm md:text-base"
+                  >
+                    Complete Module
+                    <CheckCircle className="w-4 h-4 md:w-5 md:h-5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
+
+export default KairosCERLearning;
